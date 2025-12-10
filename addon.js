@@ -214,7 +214,21 @@ module.exports = async (req, res) => {
         const path = url.split('?')[0].split('#')[0];
         const query = new URLSearchParams((url.split('?')[1] || ''));
         
-        // Handle configure page FIRST
+        // Handle manifest FIRST (before configure)
+        if (path === '/manifest.json') {
+            try {
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+                res.status(200).json(addonInterface.manifest);
+            } catch (err) {
+                console.error('Manifest error:', err);
+                res.status(500).json({ error: 'Failed to generate manifest' });
+            }
+            return;
+        }
+        
+        // Handle configure page
         if (path === '/' || path === '/configure') {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -228,13 +242,6 @@ module.exports = async (req, res) => {
                 const baseUrl = `${protocol}://${host}`;
                 res.send(`<!DOCTYPE html><html><head><title>NTVStream Sports</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e8;padding:4rem 2rem;text-align:center}h1{color:#00ff88}button{background:#00ff88;color:#000;border:none;padding:1rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin:1rem}</style></head><body><h1>🏟️ NTVStream Sports</h1><p>Live sports streaming for Stremio</p><button onclick="window.location.href='stremio://'+window.location.host+'/manifest.json'">⚡ Install in Stremio</button><p style='margin-top:2rem;color:#8b8b9e;font-size:0.9rem'>Manifest: <code>${baseUrl}/manifest.json</code></p></body></html>`);
             }
-            return;
-        }
-        
-        // Handle manifest
-        if (path === '/manifest.json') {
-            res.setHeader('Content-Type', 'application/json');
-            res.json(addonInterface.manifest);
             return;
         }
         

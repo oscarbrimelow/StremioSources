@@ -14,7 +14,11 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/configure",
+      "dest": "/configure.html"
+    },
+    {
+      "src": "/(?!configure)(.*)",
       "dest": "/api/index.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",

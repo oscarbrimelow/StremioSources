@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "addon.js",
+      "src": "api/index.js",
       "use": "@vercel/node"
     },
     {
@@ -21,7 +21,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/addon.js",
+      "dest": "/api/index.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",

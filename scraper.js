@@ -81,61 +81,203 @@ async function fetchServerEvents(server) {
         });
         
         const $ = cheerio.load(response.data);
+        const html = response.data;
         
-        // Find all match cards using the exact class from the HTML
-        $('.match-card').each((i, el) => {
-            try {
-                const $card = $(el);
-                
-                // Get category from data attribute
-                const category = $card.attr('data-category') || 'sports';
-                
-                // Get watch URL from onclick
-                const onclick = $card.attr('onclick');
-                const watchUrl = extractWatchUrl(onclick);
-                
-                // Get title
-                const title = $card.find('.match-title').text().trim();
-                
-                // Check if live
-                const isLive = $card.find('.live-badge').length > 0;
-                
-                // Get scheduled time if not live
-                let timeStr = isLive ? '🔴 LIVE' : 'Scheduled';
-                const timeEl = $card.find('.time-badge, .scheduled-badge');
-                if (timeEl.length > 0) {
-                    timeStr = timeEl.text().trim();
-                }
-                
-                // Get source count
-                const metaText = $card.find('.match-meta').text();
-                const sources = parseSourceCount(metaText);
-                
-                if (title && watchUrl) {
-                    const eventId = generateEventId(title, category);
+        // Try multiple selector strategies - NTVStream might use different classes
+        const selectors = [
+            '.match-card',
+            '.event-card',
+            '.game-card',
+            '.match-item',
+            '.event-item',
+            '[data-match]',
+            '[data-event]',
+            '.card',
+            'article',
+            '.match',
+            'tr[data-match]',
+            'li.match',
+            'a[href*="/watch"]',
+            'a[href*="/match"]',
+            'a[href*="/stream"]'
+        ];
+        
+        const processedNames = new Set();
+        
+        // Try each selector
+        for (const selector of selectors) {
+            $(selector).each((i, el) => {
+                try {
+                    const $el = $(el);
                     
-                    events.push({
-                        id: eventId,
-                        name: title,
-                        category: category,
-                        isLive: isLive,
-                        timeStr: timeStr,
-                        link: watchUrl,
-                        server: server.id,
-                        serverName: `NTVStream ${server.name}`,
-                        sources: sources,
-                        matchedCategory: matchEventToCategory(title, category)
-                    });
+                    // Try to get title from multiple places
+                    let title = '';
+                    const titleSelectors = [
+                        '.match-title',
+                        '.event-title',
+                        '.game-title',
+                        'h3', 'h4', 'h2',
+                        '.title',
+                        '.name',
+                        'a',
+                        '.team-names',
+                        '.teams'
+                    ];
+                    
+                    for (const ts of titleSelectors) {
+                        const found = $el.find(ts).first().text().trim();
+                        if (found && found.length > 3) {
+                            title = found;
+                            break;
+                        }
+                    }
+                    
+                    // If no title found, try the element itself
+                    if (!title) {
+                        title = $el.text().trim().split('\n')[0].substring(0, 100);
+                    }
+                    
+                    // Clean up title
+                    title = title.replace(/\s+/g, ' ').trim();
+                    
+                    // Skip if too short or already processed
+                    if (!title || title.length < 3 || processedNames.has(title.toLowerCase())) {
+                        return;
+                    }
+                    processedNames.add(title.toLowerCase());
+                    
+                    // Get link - try multiple ways
+                    let link = '';
+                    const linkSelectors = [
+                        'a[href]',
+                        '[href]',
+                        '[data-href]',
+                        '[data-link]',
+                        '[data-url]'
+                    ];
+                    
+                    for (const ls of linkSelectors) {
+                        const found = $el.find(ls).first().attr('href') || 
+                                     $el.find(ls).first().attr('data-href') ||
+                                     $el.find(ls).first().attr('data-link') ||
+                                     $el.find(ls).first().attr('data-url');
+                        if (found) {
+                            link = found;
+                            break;
+                        }
+                    }
+                    
+                    // Try onclick attribute
+                    if (!link) {
+                        const onclick = $el.attr('onclick') || $el.find('[onclick]').first().attr('onclick');
+                        if (onclick) {
+                            link = extractWatchUrl(onclick);
+                        }
+                    }
+                    
+                    // If still no link, try parent link
+                    if (!link) {
+                        link = $el.closest('a').attr('href') || '';
+                    }
+                    
+                    // Make link absolute
+                    if (link && !link.startsWith('http')) {
+                        if (link.startsWith('/')) {
+                            link = `https://ntvstream.cx${link}`;
+                        } else {
+                            link = `https://ntvstream.cx/${link}`;
+                        }
+                    }
+                    
+                    // Get category
+                    const category = $el.attr('data-category') || 
+                                   $el.find('[data-category]').first().attr('data-category') ||
+                                   'sports';
+                    
+                    // Check if live
+                    const isLive = $el.find('.live, .live-badge, [class*="live"]').length > 0 ||
+                                  $el.text().toLowerCase().includes('live') ||
+                                  $el.attr('class')?.toLowerCase().includes('live');
+                    
+                    // Get time
+                    let timeStr = isLive ? '🔴 LIVE' : 'Scheduled';
+                    const timeEl = $el.find('.time, .time-badge, .date, .scheduled, [class*="time"]').first();
+                    if (timeEl.length > 0) {
+                        timeStr = timeEl.text().trim() || timeStr;
+                    }
+                    
+                    // Get source count
+                    const metaText = $el.find('.meta, .match-meta, .sources, [class*="source"]').text();
+                    const sources = parseSourceCount(metaText);
+                    
+                    // Only add if we have title and link
+                    if (title && link) {
+                        const eventId = generateEventId(title, category);
+                        
+                        events.push({
+                            id: eventId,
+                            name: title,
+                            category: category,
+                            isLive: isLive,
+                            timeStr: timeStr,
+                            link: link,
+                            server: server.id,
+                            serverName: `NTVStream ${server.name}`,
+                            sources: sources,
+                            matchedCategory: matchEventToCategory(title, category)
+                        });
+                    }
+                } catch (err) {
+                    // Skip malformed element
+                    console.log(`Skipping element: ${err.message}`);
                 }
-            } catch (err) {
-                // Skip malformed card
+            });
+            
+            // If we found events with this selector, break
+            if (events.length > 0) {
+                console.log(`✅ Found events using selector: ${selector}`);
+                break;
             }
-        });
+        }
+        
+        // Fallback: Look for any links that might be matches
+        if (events.length === 0) {
+            console.log('⚠️ No events found with standard selectors, trying fallback...');
+            $('a[href*="watch"], a[href*="match"], a[href*="stream"]').each((i, el) => {
+                try {
+                    const $el = $(el);
+                    const title = $el.text().trim();
+                    const link = $el.attr('href');
+                    
+                    if (title && title.length > 3 && link && !processedNames.has(title.toLowerCase())) {
+                        processedNames.add(title.toLowerCase());
+                        const fullLink = link.startsWith('http') ? link : `https://ntvstream.cx${link}`;
+                        const eventId = generateEventId(title, 'sports');
+                        
+                        events.push({
+                            id: eventId,
+                            name: title,
+                            category: 'sports',
+                            isLive: false,
+                            timeStr: 'Live',
+                            link: fullLink,
+                            server: server.id,
+                            serverName: `NTVStream ${server.name}`,
+                            sources: 1,
+                            matchedCategory: matchEventToCategory(title, 'sports')
+                        });
+                    }
+                } catch (err) {
+                    // Skip
+                }
+            });
+        }
         
         console.log(`✅ Found ${events.length} events from ${server.name}`);
         
     } catch (error) {
         console.error(`❌ Error fetching from ${server.name}:`, error.message);
+        console.error('Error stack:', error.stack);
     }
     
     return events;

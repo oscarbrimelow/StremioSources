@@ -3,7 +3,7 @@
  * Serverless-compatible for Vercel deployment
  */
 
-const { addonBuilder, getRouter } = require('stremio-addon-sdk');
+const { addonBuilder } = require('stremio-addon-sdk');
 const { SERVERS, CATEGORIES, getCatalogDefinitions } = require('./servers');
 const { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls } = require('./scraper');
 
@@ -27,10 +27,15 @@ const manifest = {
 // Create builder
 const builder = new addonBuilder(manifest);
 
+// Store handlers
+let catalogHandler, metaHandler, streamHandler;
+
 /**
  * Convert event to Stremio meta format
  */
 function eventToMeta(event) {
+    if (!event) return null;
+    
     const icon = event.matchedCategory?.icon || '🏆';
     return {
         id: event.id,
@@ -39,9 +44,9 @@ function eventToMeta(event) {
         poster: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
         posterShape: 'square',
         background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
-        description: `${icon} ${event.matchedCategory?.name || 'Sports'}\n📺 ${event.serverName}\n⏰ ${event.timeStr}\n📡 ${event.sources} source(s)`,
+        description: `${icon} ${event.matchedCategory?.name || 'Sports'}\n📺 ${event.serverName || 'NTVStream'}\n⏰ ${event.timeStr || 'Live'}\n📡 ${event.sources || 1} source(s)`,
         genres: event.matchedCategory?.genres || ['Sports'],
-        releaseInfo: event.timeStr,
+        releaseInfo: event.timeStr || 'Live',
         runtime: event.isLive ? 'LIVE NOW' : 'Scheduled'
     };
 }
@@ -50,8 +55,6 @@ function eventToMeta(event) {
  * Catalog Handler
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
-    console.log(`📋 Catalog: ${id}`);
-    
     try {
         let events = [];
         
@@ -62,9 +65,10 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         }
         
         const skip = parseInt(extra?.skip) || 0;
-        const metas = events.slice(skip, skip + 100).map(eventToMeta);
+        const metas = events.slice(skip, skip + 100)
+            .map(eventToMeta)
+            .filter(m => m !== null);
         
-        console.log(`📋 Returning ${metas.length} events`);
         return { metas };
     } catch (error) {
         console.error('Catalog error:', error);
@@ -76,11 +80,8 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
  * Meta Handler
  */
 builder.defineMetaHandler(async ({ type, id }) => {
-    console.log(`📝 Meta: ${id}`);
-    
     try {
         const event = await getEventById(id);
-        if (!event) return { meta: null };
         return { meta: eventToMeta(event) };
     } catch (error) {
         console.error('Meta error:', error);
@@ -92,13 +93,11 @@ builder.defineMetaHandler(async ({ type, id }) => {
  * Stream Handler
  */
 builder.defineStreamHandler(async ({ type, id }) => {
-    console.log(`🎬 Stream: ${id}`);
-    
     try {
         const event = await getEventById(id);
         if (!event) return { streams: [] };
         
-        const serverConfig = SERVERS[event.server] || { name: 'NTVStream' };
+        const serverConfig = SERVERS[event.server] || { name: 'NTVStream', baseUrl: 'https://ntvstream.cx' };
         const scrapedStreams = await fetchStreamUrls(event.link, serverConfig);
         
         const streams = scrapedStreams.map((s, i) => {
@@ -115,7 +114,6 @@ builder.defineStreamHandler(async ({ type, id }) => {
             };
         });
         
-        console.log(`🎬 Returning ${streams.length} streams`);
         return { streams };
     } catch (error) {
         console.error('Stream error:', error);
@@ -123,13 +121,93 @@ builder.defineStreamHandler(async ({ type, id }) => {
     }
 });
 
-// Get the router for serverless
+// Get the addon interface
 const addonInterface = builder.getInterface();
 
-// Export for Vercel serverless
-module.exports = (req, res) => {
-    const router = getRouter(addonInterface);
-    router(req, res);
+// Vercel serverless handler
+module.exports = async (req, res) => {
+    try {
+        // Set CORS headers
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        if (req.method === 'OPTIONS') {
+            res.status(200).end();
+            return;
+        }
+        
+        // Parse URL - handle both query string and path
+        const url = req.url || '/';
+        const [path, queryString] = url.split('?');
+        const query = new URLSearchParams(queryString || '');
+        
+        // Handle manifest
+        if (path === '/manifest.json' || path === '/') {
+            res.setHeader('Content-Type', 'application/json');
+            res.json(addonInterface.manifest);
+            return;
+        }
+        
+        // Handle catalog: /catalog/:type/:id.json
+        const catalogMatch = path.match(/^\/catalog\/([^\/]+)\/([^\/]+)\.json$/);
+        if (catalogMatch) {
+            const [, type, id] = catalogMatch;
+            const extra = {};
+            query.forEach((value, key) => {
+                extra[key] = value;
+            });
+            try {
+                const result = await addonInterface.catalog.get({ type, id, extra });
+                res.setHeader('Content-Type', 'application/json');
+                res.json(result);
+            } catch (err) {
+                console.error('Catalog handler error:', err);
+                res.status(500).json({ error: err.message });
+            }
+            return;
+        }
+        
+        // Handle meta: /meta/:type/:id.json
+        const metaMatch = path.match(/^\/meta\/([^\/]+)\/([^\/]+)\.json$/);
+        if (metaMatch) {
+            const [, type, id] = metaMatch;
+            try {
+                const result = await addonInterface.meta.get({ type, id });
+                res.setHeader('Content-Type', 'application/json');
+                res.json(result);
+            } catch (err) {
+                console.error('Meta handler error:', err);
+                res.status(500).json({ error: err.message });
+            }
+            return;
+        }
+        
+        // Handle stream: /stream/:type/:id.json
+        const streamMatch = path.match(/^\/stream\/([^\/]+)\/([^\/]+)\.json$/);
+        if (streamMatch) {
+            const [, type, id] = streamMatch;
+            try {
+                const result = await addonInterface.stream.get({ type, id });
+                res.setHeader('Content-Type', 'application/json');
+                res.json(result);
+            } catch (err) {
+                console.error('Stream handler error:', err);
+                res.status(500).json({ error: err.message });
+            }
+            return;
+        }
+        
+        // 404 for unknown routes
+        res.status(404).json({ error: 'Not found', path });
+        
+    } catch (error) {
+        console.error('Serverless error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error', 
+            message: error.message
+        });
+    }
 };
 
 // Also allow local running
@@ -139,5 +217,9 @@ if (require.main === module) {
         .then(({ url }) => {
             console.log(`✅ Addon running at: ${url}`);
             console.log(`📋 Manifest: ${url}/manifest.json`);
+        })
+        .catch(err => {
+            console.error('Failed to start:', err);
+            process.exit(1);
         });
 }

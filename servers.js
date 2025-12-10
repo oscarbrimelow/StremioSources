@@ -1,6 +1,6 @@
 /**
- * Server configurations for NTVStream and other streaming sources
- * Users can enable/disable servers from the configuration page
+ * Server and category configurations for NTVStream
+ * Updated based on actual site structure
  */
 
 const SERVERS = {
@@ -10,92 +10,67 @@ const SERVERS = {
         baseUrl: 'https://ntvstream.cx',
         enabled: true,
         priority: 1,
-        description: 'Primary live sports streaming source',
-        logo: 'https://ntvstream.cx/favicon.ico'
+        description: 'Primary live sports streaming (KOBRA server)'
     },
-    ntvstream_backup: {
-        id: 'ntvstream_backup',
-        name: 'NTVStream Backup',
-        baseUrl: 'https://ntvstream.live',
+    ntvstream_titan: {
+        id: 'ntvstream_titan',
+        name: 'NTVStream TITAN',
+        baseUrl: 'https://ntvstream.cx',
         enabled: true,
         priority: 2,
-        description: 'Backup NTVStream server'
+        description: 'TITAN server'
     },
-    stream2watch: {
-        id: 'stream2watch',
-        name: 'Stream2Watch',
-        baseUrl: 'https://stream2watch.sx',
-        enabled: false,
+    ntvstream_raptor: {
+        id: 'ntvstream_raptor',
+        name: 'NTVStream RAPTOR',
+        baseUrl: 'https://ntvstream.cx',
+        enabled: true,
         priority: 3,
-        description: 'Alternative sports streaming'
+        description: 'RAPTOR server'
     },
-    crackstreams: {
-        id: 'crackstreams',
-        name: 'CrackStreams',
-        baseUrl: 'https://crackstreams.biz',
-        enabled: false,
+    ntvstream_phoenix: {
+        id: 'ntvstream_phoenix',
+        name: 'NTVStream PHOENIX',
+        baseUrl: 'https://ntvstream.cx',
+        enabled: true,
         priority: 4,
-        description: 'Sports streaming alternative'
+        description: 'PHOENIX server (TV Shows & more)'
     }
 };
 
-// Sports categories supported by the addon
+// Categories based on actual NTVStream categories from screenshots
 const CATEGORIES = {
     football: {
         id: 'football',
         name: 'Football / Soccer',
         type: 'tv',
-        genres: ['Football', 'Soccer', 'Premier League', 'La Liga', 'Champions League'],
+        genres: ['Football', 'Soccer', 'Premier League', 'La Liga', 'Champions League', 'Serie A', 'Bundesliga', 'Championship'],
         icon: '⚽',
-        keywords: ['football', 'soccer', 'premier', 'liga', 'champions', 'epl', 'uefa']
-    },
-    american_football: {
-        id: 'american_football',
-        name: 'American Football',
-        type: 'tv',
-        genres: ['NFL', 'NCAA Football', 'American Football'],
-        icon: '🏈',
-        keywords: ['nfl', 'ncaa', 'american football', 'superbowl']
+        keywords: ['football', 'soccer', 'premier', 'liga', 'champions', 'epl', 'uefa', 'serie a', 'bundesliga', 'fa cup', 'world cup', 'league one', 'league two', 'championship']
     },
     basketball: {
         id: 'basketball',
         name: 'Basketball',
         type: 'tv',
-        genres: ['NBA', 'Basketball', 'NCAA Basketball'],
+        genres: ['Basketball', 'NBA', 'NCAA', 'EuroLeague', 'Champions League Basketball'],
         icon: '🏀',
-        keywords: ['nba', 'basketball', 'ncaa']
+        keywords: ['basketball', 'nba', 'ncaa', 'euroleague', 'fiba', 'wnba', 'bcl']
+    },
+    hockey: {
+        id: 'hockey',
+        name: 'Hockey',
+        type: 'tv',
+        genres: ['Hockey', 'NHL', 'Ice Hockey', 'Field Hockey'],
+        icon: '🏒',
+        keywords: ['hockey', 'nhl', 'ice hockey', 'field hockey', 'khl']
     },
     cricket: {
         id: 'cricket',
         name: 'Cricket',
         type: 'tv',
-        genres: ['Cricket', 'IPL', 'Test Cricket', 'T20'],
+        genres: ['Cricket', 'IPL', 'Test Cricket', 'T20', 'ODI'],
         icon: '🏏',
-        keywords: ['cricket', 'ipl', 't20', 'test', 'odi', 'bbl']
-    },
-    ufc_mma: {
-        id: 'ufc_mma',
-        name: 'UFC / MMA',
-        type: 'tv',
-        genres: ['UFC', 'MMA', 'Mixed Martial Arts', 'Bellator'],
-        icon: '🥊',
-        keywords: ['ufc', 'mma', 'bellator', 'fight', 'martial']
-    },
-    boxing: {
-        id: 'boxing',
-        name: 'Boxing',
-        type: 'tv',
-        genres: ['Boxing', 'Fight Night'],
-        icon: '🥊',
-        keywords: ['boxing', 'fight', 'heavyweight', 'ppv']
-    },
-    wrestling: {
-        id: 'wrestling',
-        name: 'Wrestling / WWE',
-        type: 'tv',
-        genres: ['WWE', 'Wrestling', 'AEW'],
-        icon: '🤼',
-        keywords: ['wwe', 'wrestling', 'aew', 'raw', 'smackdown']
+        keywords: ['cricket', 'ipl', 't20', 'test', 'odi', 'bbl', 'psl', 'ashes']
     },
     tennis: {
         id: 'tennis',
@@ -103,47 +78,119 @@ const CATEGORIES = {
         type: 'tv',
         genres: ['Tennis', 'ATP', 'WTA', 'Grand Slam'],
         icon: '🎾',
-        keywords: ['tennis', 'atp', 'wta', 'wimbledon', 'usopen']
-    },
-    hockey: {
-        id: 'hockey',
-        name: 'Hockey',
-        type: 'tv',
-        genres: ['NHL', 'Hockey', 'Ice Hockey'],
-        icon: '🏒',
-        keywords: ['nhl', 'hockey', 'ice hockey']
-    },
-    baseball: {
-        id: 'baseball',
-        name: 'Baseball',
-        type: 'tv',
-        genres: ['MLB', 'Baseball'],
-        icon: '⚾',
-        keywords: ['mlb', 'baseball']
-    },
-    motorsport: {
-        id: 'motorsport',
-        name: 'Motorsport',
-        type: 'tv',
-        genres: ['F1', 'Formula 1', 'NASCAR', 'MotoGP'],
-        icon: '🏎️',
-        keywords: ['f1', 'formula', 'nascar', 'motogp', 'racing']
-    },
-    rugby: {
-        id: 'rugby',
-        name: 'Rugby',
-        type: 'tv',
-        genres: ['Rugby', 'Rugby Union', 'Rugby League'],
-        icon: '🏉',
-        keywords: ['rugby', 'union', 'league']
+        keywords: ['tennis', 'atp', 'wta', 'wimbledon', 'usopen', 'french open', 'australian open']
     },
     golf: {
         id: 'golf',
         name: 'Golf',
         type: 'tv',
-        genres: ['Golf', 'PGA', 'Masters'],
+        genres: ['Golf', 'PGA', 'Masters', 'Ryder Cup'],
         icon: '⛳',
-        keywords: ['golf', 'pga', 'masters']
+        keywords: ['golf', 'pga', 'masters', 'ryder cup', 'open championship']
+    },
+    ufc_mma: {
+        id: 'ufc_mma',
+        name: 'UFC / MMA',
+        type: 'tv',
+        genres: ['UFC', 'MMA', 'Mixed Martial Arts', 'Bellator'],
+        icon: '🥊',
+        keywords: ['ufc', 'mma', 'bellator', 'fight', 'martial', 'one fc', 'pfl']
+    },
+    boxing: {
+        id: 'boxing',
+        name: 'Boxing',
+        type: 'tv',
+        genres: ['Boxing', 'Fight Night', 'PPV Boxing'],
+        icon: '🥊',
+        keywords: ['boxing', 'fight', 'heavyweight', 'ppv']
+    },
+    wrestling: {
+        id: 'wrestling',
+        name: 'WWE / Wrestling',
+        type: 'tv',
+        genres: ['WWE', 'Wrestling', 'AEW', 'NXT'],
+        icon: '🤼',
+        keywords: ['wwe', 'wrestling', 'aew', 'raw', 'smackdown', 'nxt', 'wrestlemania']
+    },
+    nfl: {
+        id: 'nfl',
+        name: 'NFL / American Football',
+        type: 'tv',
+        genres: ['NFL', 'American Football', 'NCAA Football', 'Super Bowl'],
+        icon: '🏈',
+        keywords: ['nfl', 'american football', 'superbowl', 'ncaa football', 'college football']
+    },
+    nba: {
+        id: 'nba',
+        name: 'NBA',
+        type: 'tv',
+        genres: ['NBA', 'Basketball'],
+        icon: '🏀',
+        keywords: ['nba']
+    },
+    baseball: {
+        id: 'baseball',
+        name: 'Baseball / MLB',
+        type: 'tv',
+        genres: ['MLB', 'Baseball', 'World Series'],
+        icon: '⚾',
+        keywords: ['mlb', 'baseball', 'world series']
+    },
+    rugby: {
+        id: 'rugby',
+        name: 'Rugby',
+        type: 'tv',
+        genres: ['Rugby', 'Rugby Union', 'Rugby League', 'Six Nations'],
+        icon: '🏉',
+        keywords: ['rugby', 'union', 'league', 'six nations']
+    },
+    motorsport: {
+        id: 'motorsport',
+        name: 'Motorsport / F1',
+        type: 'tv',
+        genres: ['F1', 'Formula 1', 'NASCAR', 'MotoGP', 'IndyCar'],
+        icon: '🏎️',
+        keywords: ['f1', 'formula', 'nascar', 'motogp', 'racing', 'indycar', 'grand prix']
+    },
+    snooker: {
+        id: 'snooker',
+        name: 'Snooker',
+        type: 'tv',
+        genres: ['Snooker', 'Pool', 'Billiards'],
+        icon: '🎱',
+        keywords: ['snooker', 'pool', 'billiards']
+    },
+    darts: {
+        id: 'darts',
+        name: 'Darts',
+        type: 'tv',
+        genres: ['Darts', 'PDC'],
+        icon: '🎯',
+        keywords: ['darts', 'pdc']
+    },
+    handball: {
+        id: 'handball',
+        name: 'Handball',
+        type: 'tv',
+        genres: ['Handball'],
+        icon: '🤾',
+        keywords: ['handball']
+    },
+    futsal: {
+        id: 'futsal',
+        name: 'Futsal',
+        type: 'tv',
+        genres: ['Futsal', 'Indoor Football'],
+        icon: '⚽',
+        keywords: ['futsal', 'indoor']
+    },
+    tvshows: {
+        id: 'tvshows',
+        name: 'TV Shows',
+        type: 'tv',
+        genres: ['TV Shows', 'Entertainment', 'Talk Shows'],
+        icon: '📺',
+        keywords: ['tv shows', 'tvshows', 'show', 'episode', 'season', 'talk show']
     },
     other_sports: {
         id: 'other_sports',
@@ -155,7 +202,7 @@ const CATEGORIES = {
     }
 };
 
-// Generate catalog definitions for the addon manifest
+// Generate catalog definitions
 function getCatalogDefinitions() {
     return Object.values(CATEGORIES).map(cat => ({
         type: cat.type,
@@ -168,11 +215,10 @@ function getCatalogDefinitions() {
     }));
 }
 
-// Get all enabled servers sorted by priority
+// Get enabled servers
 function getEnabledServers(userConfig = {}) {
     return Object.values(SERVERS)
         .filter(server => {
-            // Check user config first, fall back to default
             if (userConfig.servers && userConfig.servers[server.id] !== undefined) {
                 return userConfig.servers[server.id];
             }
@@ -183,16 +229,25 @@ function getEnabledServers(userConfig = {}) {
 
 // Get category by ID
 function getCategoryById(categoryId) {
-    // Remove prefix if present
     const cleanId = categoryId.replace('ntvstream_', '');
     return CATEGORIES[cleanId] || null;
 }
 
-// Match an event to a category based on keywords
-function matchEventToCategory(eventName, eventDescription = '') {
-    const searchText = `${eventName} ${eventDescription}`.toLowerCase();
+// Match event to category
+function matchEventToCategory(eventName, eventCategory = '') {
+    const searchText = `${eventName} ${eventCategory}`.toLowerCase();
     
-    for (const [id, category] of Object.entries(CATEGORIES)) {
+    // Direct category match first
+    if (eventCategory) {
+        const directMatch = Object.values(CATEGORIES).find(cat => 
+            cat.id === eventCategory.toLowerCase() ||
+            cat.keywords.includes(eventCategory.toLowerCase())
+        );
+        if (directMatch) return directMatch;
+    }
+    
+    // Keyword search
+    for (const category of Object.values(CATEGORIES)) {
         for (const keyword of category.keywords) {
             if (searchText.includes(keyword.toLowerCase())) {
                 return category;
@@ -211,4 +266,3 @@ module.exports = {
     getCategoryById,
     matchEventToCategory
 };
-

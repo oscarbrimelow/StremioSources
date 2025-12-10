@@ -142,8 +142,14 @@ module.exports = async (req, res) => {
         const [path, queryString] = url.split('?');
         const query = new URLSearchParams(queryString || '');
         
-        // Handle configure page
+        // Skip configure - handled by dedicated function at /api/configure
         if (path === '/configure' || path === '/configure.html') {
+            res.status(404).json({ error: 'Use /api/configure' });
+            return;
+        }
+        
+        // REMOVED: Configure page handling - now in separate function
+        if (false && path === '/configure' || path === '/configure.html') {
             const fs = require('fs');
             const pathModule = require('path');
             try {

@@ -14,11 +14,27 @@
   ],
   "routes": [
     {
-      "src": "/configure",
-      "dest": "/configure.html"
+      "src": "/manifest.json",
+      "dest": "/api/index.js"
     },
     {
-      "src": "/(?!configure)(.*)",
+      "src": "/catalog/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/meta/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/stream/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
       "dest": "/api/index.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",

@@ -142,6 +142,21 @@ module.exports = async (req, res) => {
         const [path, queryString] = url.split('?');
         const query = new URLSearchParams(queryString || '');
         
+        // Handle configure page
+        if (path === '/configure' || path === '/configure.html') {
+            const fs = require('fs');
+            const pathModule = require('path');
+            try {
+                const htmlPath = pathModule.join(__dirname, 'public', 'configure.html');
+                const html = fs.readFileSync(htmlPath, 'utf8');
+                res.setHeader('Content-Type', 'text/html');
+                res.send(html);
+            } catch (err) {
+                res.status(404).send('Configure page not found');
+            }
+            return;
+        }
+        
         // Handle manifest
         if (path === '/manifest.json' || path === '/') {
             res.setHeader('Content-Type', 'application/json');

@@ -462,18 +462,21 @@
         <!-- Install Section -->
         <div class="card install-section">
             <h2 class="card-title" style="justify-content: center;"><span>🚀</span> Install Addon</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                Copy the manifest URL below or click Install to add to Stremio
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; text-align: center;">
+                Click the button below to automatically install this addon in Stremio!
             </p>
-            <div class="install-url" id="manifestUrl">Loading...</div>
+            <div class="install-url" id="manifestUrl" style="text-align: center; font-size: 0.85rem; opacity: 0.8;">Loading...</div>
             <div class="button-group">
-                <button class="btn btn-primary" onclick="installAddon()">
-                    <span>⚡</span> Install in Stremio
+                <button class="btn btn-primary" onclick="installAddon()" style="font-size: 1.1rem; padding: 1.2rem 2.5rem;">
+                    <span>⚡</span> Install in Stremio Now
                 </button>
                 <button class="btn btn-secondary" onclick="copyUrl()">
                     <span>📋</span> Copy URL
                 </button>
             </div>
+            <p style="color: var(--text-secondary); margin-top: 1rem; font-size: 0.9rem; text-align: center;">
+                💡 If the button doesn't work, copy the URL above and paste it in Stremio → Addons → Search
+            </p>
         </div>
 
         <footer class="footer">
@@ -618,16 +621,8 @@
         }
 
         function updateManifestUrl() {
-            const config = {
-                servers: selectedServers.reduce((acc, id) => {
-                    acc[id] = true;
-                    return acc;
-                }, {})
-            };
-            
-            const configStr = btoa(JSON.stringify(config));
-            const manifestUrl = `${baseUrl}/${configStr}/manifest.json`;
-            
+            // Simple manifest URL without config (since we removed configurable)
+            const manifestUrl = `${baseUrl}/manifest.json`;
             document.getElementById('manifestUrl').textContent = manifestUrl;
         }
 
@@ -637,8 +632,50 @@
 
         function installAddon() {
             const manifestUrl = getManifestUrl();
-            const stremioUrl = manifestUrl.replace(/^https?:\/\//, 'stremio://');
-            window.location.href = stremioUrl;
+            
+            // Try stremio:// protocol first
+            const stremioUrl = `stremio://${manifestUrl.replace(/^https?:\/\//, '')}`;
+            
+            // Create a hidden link and click it
+            const link = document.createElement('a');
+            link.href = stremioUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            
+            try {
+                link.click();
+                showToast('Opening Stremio... If it doesn\'t open, copy the URL and paste it in Stremio manually.');
+            } catch (e) {
+                // Fallback: try window.location
+                try {
+                    window.location.href = stremioUrl;
+                } catch (e2) {
+                    // If that fails, show instructions
+                    showToast('Please copy the URL and paste it in Stremio Addons section');
+                }
+            }
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(link);
+            }, 100);
+            
+            // Also try opening in new window as fallback
+            setTimeout(() => {
+                // If Stremio didn't open, show manual instructions
+                const userConfirmed = confirm(
+                    'If Stremio didn\'t open automatically:\n\n' +
+                    '1. Open Stremio\n' +
+                    '2. Go to Addons\n' +
+                    '3. Click the search box\n' +
+                    '4. Paste this URL:\n' + manifestUrl + '\n\n' +
+                    'Click OK to copy the URL to clipboard.'
+                );
+                
+                if (userConfirmed) {
+                    copyUrl();
+                }
+            }, 2000);
         }
 
         function copyUrl() {

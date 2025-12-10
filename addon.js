@@ -7,7 +7,7 @@ const { addonBuilder } = require('stremio-addon-sdk');
 const { SERVERS, CATEGORIES, getCatalogDefinitions } = require('./servers');
 const { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls } = require('./scraper');
 
-// Addon manifest
+// Addon manifest - Single catalog like StreamsPPV
 const manifest = {
     id: 'community.ntvstream.sports',
     version: '1.0.0',
@@ -18,7 +18,17 @@ const manifest = {
     resources: ['catalog', 'meta', 'stream'],
     types: ['tv'],
     idPrefixes: ['ntv_'],
-    catalogs: getCatalogDefinitions(),
+    catalogs: [
+        { 
+            id: 'streams', 
+            type: 'tv', 
+            name: 'Live Sports Streams',
+            extra: [
+                { name: 'skip', isRequired: false },
+                { name: 'search', isRequired: false }
+            ]
+        }
+    ],
     behaviorHints: {
         configurable: false
     }
@@ -35,17 +45,15 @@ function eventToMetaPreview(event) {
         return null;
     }
     
-    const icon = event.matchedCategory?.icon || '🏆';
-    const categoryName = event.matchedCategory?.name || 'Sports';
-    
+    // Simple format like StreamsPPV - just show the event name
     return {
         id: event.id,
         type: 'tv',
         name: event.isLive ? `🔴 ${event.name}` : event.name,
         poster: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
         posterShape: 'landscape',
-        background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
-        description: `${icon} ${categoryName} - ${event.serverName || 'NTVStream'}`,
+        background: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
+        description: event.name,
         logo: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
     };
 }
@@ -81,7 +89,7 @@ function eventToMetaDetail(event) {
 }
 
 /**
- * Catalog Handler - matches PPVstreams structure
+ * Catalog Handler - Single catalog with ALL events (like StreamsPPV)
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
     try {
@@ -90,9 +98,11 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         let events = [];
         
         if (extra?.search) {
+            // Search across all events
             events = await searchEvents(extra.search);
         } else {
-            events = await getEventsByCategory(id);
+            // Get ALL events regardless of category (single catalog)
+            events = await getEventsByCategory('all');
         }
         
         if (!Array.isArray(events)) {
@@ -108,7 +118,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
             .map(eventToMetaPreview)
             .filter(m => m !== null);
         
-        console.log(`📋 Returning ${results.length} items for ${id}`);
+        console.log(`📋 Returning ${results.length} items (all sports)`);
         return { metas: results };
         
     } catch (error) {

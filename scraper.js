@@ -147,21 +147,31 @@ async function fetchServerEvents(server) {
 async function fetchAllEvents(userConfig = {}) {
     // Check cache first
     if (cache.events && Date.now() - cache.timestamp < cache.ttl) {
-        console.log('📦 Using cached events');
+        console.log(`📦 Using cached events (${cache.events.length} events)`);
         return cache.events;
     }
     
     console.log('🔄 Fetching fresh events from NTVStream...');
     
-    // Fetch from primary server first (kobra)
-    let allEvents = await fetchServerEvents(NTV_SERVERS[0]);
+    let allEvents = [];
     
-    // If we got events, great! Otherwise try other servers
-    if (allEvents.length === 0) {
-        for (let i = 1; i < NTV_SERVERS.length; i++) {
-            allEvents = await fetchServerEvents(NTV_SERVERS[i]);
-            if (allEvents.length > 0) break;
+    // Try all servers and combine results
+    for (const server of NTV_SERVERS) {
+        try {
+            console.log(`🔄 Fetching from ${server.name}...`);
+            const serverEvents = await fetchServerEvents(server);
+            console.log(`✅ Got ${serverEvents.length} events from ${server.name}`);
+            allEvents = allEvents.concat(serverEvents);
+        } catch (err) {
+            console.error(`❌ Error fetching from ${server.name}:`, err.message);
+            // Continue to next server
         }
+    }
+    
+    // If still no events, return empty array
+    if (allEvents.length === 0) {
+        console.warn('⚠️ No events fetched from any server');
+        return [];
     }
     
     // Sort: Live first, then by source count, then alphabetically

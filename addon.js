@@ -34,21 +34,43 @@ let catalogHandler, metaHandler, streamHandler;
  * Convert event to Stremio meta format
  */
 function eventToMeta(event) {
-    if (!event) return null;
+    if (!event || !event.id || !event.name) {
+        console.warn('Invalid event:', event);
+        return null;
+    }
     
     const icon = event.matchedCategory?.icon || '🏆';
-    return {
+    const categoryName = event.matchedCategory?.name || 'Sports';
+    
+    // Build description
+    const descParts = [
+        `${icon} ${categoryName}`,
+        `📺 ${event.serverName || 'NTVStream'}`,
+        `⏰ ${event.timeStr || 'Live'}`,
+        `📡 ${event.sources || 1} source(s)`
+    ];
+    
+    // Create meta object with all required fields
+    const meta = {
         id: event.id,
         type: 'tv',
         name: event.isLive ? `🔴 ${event.name}` : event.name,
         poster: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
         posterShape: 'square',
         background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
-        description: `${icon} ${event.matchedCategory?.name || 'Sports'}\n📺 ${event.serverName || 'NTVStream'}\n⏰ ${event.timeStr || 'Live'}\n📡 ${event.sources || 1} source(s)`,
-        genres: event.matchedCategory?.genres || ['Sports'],
-        releaseInfo: event.timeStr || 'Live',
-        runtime: event.isLive ? 'LIVE NOW' : 'Scheduled'
+        description: descParts.join('\n'),
+        genres: event.matchedCategory?.genres || ['Sports']
     };
+    
+    // Add releaseInfo if available (Stremio expects date string or year)
+    if (event.timeStr && event.timeStr !== 'Live' && event.timeStr !== '🔴 LIVE') {
+        meta.releaseInfo = event.timeStr;
+    } else {
+        // Use current year for live events
+        meta.releaseInfo = new Date().getFullYear().toString();
+    }
+    
+    return meta;
 }
 
 /**
@@ -56,36 +78,69 @@ function eventToMeta(event) {
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
     try {
-        console.log(`📋 Catalog request: type=${type}, id=${id}`);
+        console.log(`📋 Catalog request: type=${type}, id=${id}, extra=`, extra);
         
         let events = [];
         
-        // Add timeout for Vercel
+        // Increase timeout for Vercel (10s max for free tier)
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Catalog fetch timeout')), 8000)
+            setTimeout(() => reject(new Error('Catalog fetch timeout')), 9000)
         );
         
-        if (extra?.search) {
-            events = await Promise.race([
-                searchEvents(extra.search),
-                timeoutPromise
-            ]);
-        } else {
-            events = await Promise.race([
-                getEventsByCategory(id),
-                timeoutPromise
-            ]);
+        try {
+            if (extra?.search) {
+                console.log(`📋 Searching for: ${extra.search}`);
+                events = await Promise.race([
+                    searchEvents(extra.search),
+                    timeoutPromise
+                ]);
+            } else {
+                console.log(`📋 Getting events for category: ${id}`);
+                events = await Promise.race([
+                    getEventsByCategory(id),
+                    timeoutPromise
+                ]);
+            }
+            
+            console.log(`📋 Fetched ${events.length} events`);
+        } catch (fetchError) {
+            console.error('Error fetching events:', fetchError.message || fetchError);
+            // Return empty instead of crashing
+            return { metas: [] };
+        }
+        
+        if (!Array.isArray(events)) {
+            console.error('Events is not an array:', typeof events);
+            return { metas: [] };
         }
         
         const skip = parseInt(extra?.skip) || 0;
-        const metas = events.slice(skip, skip + 100)
-            .map(eventToMeta)
+        const limit = 100;
+        const paginatedEvents = events.slice(skip, skip + limit);
+        
+        console.log(`📋 Processing ${paginatedEvents.length} events (skip=${skip})`);
+        
+        const metas = paginatedEvents
+            .map(event => {
+                try {
+                    return eventToMeta(event);
+                } catch (err) {
+                    console.error('Error converting event to meta:', err, event);
+                    return null;
+                }
+            })
             .filter(m => m !== null);
         
-        console.log(`📋 Returning ${metas.length} items for catalog: ${id}`);
+        console.log(`📋 Returning ${metas.length} valid meta items for catalog: ${id}`);
+        
+        if (metas.length === 0) {
+            console.warn(`⚠️ No metas returned for category ${id}. Events count: ${events.length}`);
+        }
+        
         return { metas };
     } catch (error) {
-        console.error('Catalog error:', error.message || error);
+        console.error('Catalog handler error:', error.message || error);
+        console.error('Stack:', error.stack);
         return { metas: [] };
     }
 });

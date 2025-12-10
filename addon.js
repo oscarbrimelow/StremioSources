@@ -78,15 +78,15 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         }
         
         const skip = parseInt(extra?.skip) || 0;
-        const meta = events.slice(skip, skip + 100)
+        const metas = events.slice(skip, skip + 100)
             .map(eventToMeta)
             .filter(m => m !== null);
         
-        console.log(`📋 Returning ${meta.length} items for catalog: ${id}`);
-        return { meta };
+        console.log(`📋 Returning ${metas.length} items for catalog: ${id}`);
+        return { metas };
     } catch (error) {
         console.error('Catalog error:', error.message || error);
-        return { meta: [] };
+        return { metas: [] };
     }
 });
 
@@ -422,7 +422,7 @@ module.exports = async (req, res) => {
                 // Return empty catalog instead of error
                 res.setHeader('Content-Type', 'application/json');
                 res.setHeader('Access-Control-Allow-Origin', '*');
-                res.json({ meta: [] });
+                res.json({ metas: [] });
             }
             return;
         }

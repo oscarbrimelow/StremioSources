@@ -94,11 +94,39 @@ builder.defineMetaHandler(async ({ type, id }) => {
  */
 builder.defineStreamHandler(async ({ type, id }) => {
     try {
+        console.log(`🎬 Stream request: type=${type}, id=${id}`);
+        
         const event = await getEventById(id);
-        if (!event) return { streams: [] };
+        if (!event) {
+            console.log(`🎬 Event not found for id: ${id}`);
+            return { streams: [] };
+        }
+        
+        console.log(`🎬 Found event: ${event.name}, link: ${event.link}`);
         
         const serverConfig = SERVERS[event.server] || { name: 'NTVStream', baseUrl: 'https://ntvstream.cx' };
-        const scrapedStreams = await fetchStreamUrls(event.link, serverConfig);
+        
+        // Add timeout wrapper for Vercel (max 10s for free tier)
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Stream fetch timeout')), 8000)
+        );
+        
+        const scrapedStreams = await Promise.race([
+            fetchStreamUrls(event.link, serverConfig),
+            timeoutPromise
+        ]);
+        
+        if (!scrapedStreams || scrapedStreams.length === 0) {
+            console.log(`🎬 No streams found, adding fallback`);
+            // Return the watch page as fallback
+            return {
+                streams: [{
+                    externalUrl: event.link,
+                    title: `${serverConfig.name} - Watch in Browser`,
+                    behaviorHints: { notWebReady: true }
+                }]
+            };
+        }
         
         const streams = scrapedStreams.map((s, i) => {
             if (s.isEmbed || !s.url.match(/\.(m3u8|mp4|mpd)(\?|$)/i)) {
@@ -114,10 +142,18 @@ builder.defineStreamHandler(async ({ type, id }) => {
             };
         });
         
+        console.log(`🎬 Returning ${streams.length} streams`);
         return { streams };
     } catch (error) {
-        console.error('Stream error:', error);
-        return { streams: [] };
+        console.error('Stream error:', error.message || error);
+        // Return fallback stream instead of empty
+        return {
+            streams: [{
+                externalUrl: `https://ntvstream.cx`,
+                title: 'Error loading stream - Click to open NTVStream',
+                behaviorHints: { notWebReady: true }
+            }]
+        };
     }
 });
 
@@ -354,12 +390,25 @@ module.exports = async (req, res) => {
                 extra[key] = value;
             });
             try {
-                const result = await addonInterface.catalog.get({ type, id, extra });
+                // Add timeout wrapper
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Request timeout')), 9000)
+                );
+                
+                const result = await Promise.race([
+                    addonInterface.catalog.get({ type, id, extra }),
+                    timeoutPromise
+                ]);
+                
                 res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json(result);
             } catch (err) {
-                console.error('Catalog handler error:', err);
-                res.status(500).json({ error: err.message });
+                console.error('Catalog handler error:', err.message || err);
+                // Return empty catalog instead of error
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.json({ meta: [] });
             }
             return;
         }
@@ -384,12 +433,25 @@ module.exports = async (req, res) => {
         if (streamMatch) {
             const [, type, id] = streamMatch;
             try {
-                const result = await addonInterface.stream.get({ type, id });
+                // Add timeout wrapper
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Request timeout')), 9000)
+                );
+                
+                const result = await Promise.race([
+                    addonInterface.stream.get({ type, id }),
+                    timeoutPromise
+                ]);
+                
                 res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json(result);
             } catch (err) {
-                console.error('Stream handler error:', err);
-                res.status(500).json({ error: err.message });
+                console.error('Stream handler error:', err.message || err);
+                // Return empty streams instead of error to prevent Stremio errors
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.json({ streams: [] });
             }
             return;
         }

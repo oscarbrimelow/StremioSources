@@ -127,37 +127,39 @@ const addonInterface = builder.getInterface();
 // Vercel serverless handler
 module.exports = async (req, res) => {
     try {
-        // Set CORS headers
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        // CHECK CONFIGURE FIRST - before ANYTHING else!
+        // Get path from every possible source
+        const rawUrl = req.url || req.path || req.originalUrl || '';
+        const rawPath = rawUrl.split('?')[0].split('#')[0];
         
-        if (req.method === 'OPTIONS') {
-            res.status(200).end();
-            return;
-        }
+        // Check if this is a configure request - be VERY aggressive
+        const isConfigure = rawPath === '/configure' || 
+                           rawPath === '/configure.html' || 
+                           rawPath.startsWith('/configure') ||
+                           rawUrl.includes('/configure') ||
+                           rawUrl.includes('configure') ||
+                           (req.url && String(req.url).includes('configure')) ||
+                           (req.path && String(req.path).includes('configure'));
         
-        // Parse URL - handle both query string and path
-        const url = req.url || req.path || '/';
-        const [path] = url.split('?');
-        
-        // CHECK CONFIGURE FIRST - before anything else!
-        if (path === '/configure' || path === '/configure.html' || url.includes('/configure')) {
-            // ALWAYS return HTML for configure - no exceptions!
+        if (isConfigure) {
+            // Set headers
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            res.setHeader('Access-Control-Allow-Origin', '*');
             
+            // Get base URL
+            const host = req.headers.host || req.get?.('host') || 'localhost';
+            const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http') || 'https';
+            const baseUrl = `${protocol}://${host}`;
+            
+            // Try to load from module, fallback to inline
             try {
                 const configureHTML = require('./configure-html.js');
                 res.send(configureHTML);
             } catch (e) {
-                // Inline fallback HTML - always works
-                const host = req.headers.host || req.get('host') || 'localhost';
-                const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http') || 'https';
-                const baseUrl = `${protocol}://${host}`;
-                
+                // Inline HTML - always works
                 res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -227,6 +229,7 @@ module.exports = async (req, res) => {
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
+            transition: all 0.2s;
         }
         .install-btn:hover {
             background: #00cc6a;
@@ -255,6 +258,7 @@ module.exports = async (req, res) => {
             font-weight: 500;
             font-family: inherit;
             cursor: pointer;
+            transition: all 0.2s;
         }
         .copy-btn:hover {
             background: #1a1a2e;
@@ -316,9 +320,22 @@ module.exports = async (req, res) => {
 </body>
 </html>`);
             }
-            return; // CRITICAL: Must return here!
+            return; // MUST return - don't continue!
         }
         
+        // Set CORS headers for other requests
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        if (req.method === 'OPTIONS') {
+            res.status(200).end();
+            return;
+        }
+        
+        // Parse URL - handle both query string and path
+        const url = req.url || req.path || req.originalUrl || '/';
+        const path = url.split('?')[0].split('#')[0];
         const query = new URLSearchParams((url.split('?')[1] || ''));
         
         // Handle manifest

@@ -10,7 +10,7 @@ const { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls } = req
 // Addon manifest - Single catalog like StreamsPPV
 const manifest = {
     id: 'community.ntvstream.sports',
-    version: '1.0.1',
+    version: '1.0.2',
     name: 'NTVStream',
     description: 'Live sports streaming from NTVStream. Watch Football, Basketball, Hockey, Cricket, UFC, Boxing and more!',
     logo: 'https://img.icons8.com/color/512/stadium.png',
@@ -89,42 +89,39 @@ function eventToMetaDetail(event) {
  * Catalog Handler - Single catalog with ALL events (like StreamsPPV)
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
+    console.log(`📋 Catalog handler called: type=${type}, id=${id}`);
+    
     try {
-        console.log(`📋 Catalog: type=${type}, id=${id}`);
-        
         let events = [];
         
-        if (extra?.search) {
-            // Search across all events
-            events = await searchEvents(extra.search);
-        } else {
-            // Get ALL events regardless of category (single catalog)
-            events = await getEventsByCategory('all');
+        // Always add a test event first to verify structure works
+        const testEvent = {
+            id: 'ntv_test_working',
+            name: '✅ Addon is Working - Test Event',
+            category: 'sports',
+            isLive: true,
+            timeStr: '🔴 LIVE',
+            link: 'https://ntvstream.cx',
+            server: 'kobra',
+            serverName: 'NTVStream',
+            sources: 1,
+            matchedCategory: { id: 'sports', name: 'Sports', icon: '🏆' }
+        };
+        
+        try {
+            if (extra?.search) {
+                events = await searchEvents(extra.search);
+            } else {
+                events = await getEventsByCategory('all');
+            }
+            console.log(`📋 Scraper returned ${events.length} events`);
+        } catch (scraperError) {
+            console.error('❌ Scraper error:', scraperError.message);
+            events = [];
         }
         
-        if (!Array.isArray(events)) {
-            console.error('Events is not an array');
-            return { metas: [] };
-        }
-        
-        console.log(`📋 Fetched ${events.length} events from scraper`);
-        
-        // If no events found, add a test event so catalog shows up
-        if (events.length === 0) {
-            console.warn('⚠️ No events found - adding test event');
-            events = [{
-                id: 'ntv_test_event',
-                name: 'Test Event - NTVStream Scraper',
-                category: 'sports',
-                isLive: true,
-                timeStr: '🔴 LIVE',
-                link: 'https://ntvstream.cx',
-                server: 'kobra',
-                serverName: 'NTVStream KOBRA',
-                sources: 1,
-                matchedCategory: { id: 'sports', name: 'Sports', icon: '🏆' }
-            }];
-        }
+        // Always include test event at the beginning
+        events = [testEvent, ...events];
         
         const skip = parseInt(extra?.skip) || 0;
         const limit = 100;
@@ -134,22 +131,22 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
             .map(eventToMetaPreview)
             .filter(m => m !== null);
         
-        console.log(`📋 Returning ${results.length} items (all sports)`);
+        console.log(`📋 Returning ${results.length} items`);
         return { metas: results };
         
     } catch (error) {
-        console.error('Catalog error:', error);
+        console.error('❌ Catalog handler error:', error);
         console.error('Error stack:', error.stack);
-        // Return test event on error so catalog at least shows up
+        // Always return at least the test event
         return { 
             metas: [{
-                id: 'ntv_error',
+                id: 'ntv_test_error',
                 type: 'tv',
-                name: 'Error Loading Events',
+                name: '✅ Catalog Handler Working (Error in Scraper)',
                 poster: 'https://img.icons8.com/color/512/sports.png',
                 posterShape: 'landscape',
                 background: 'https://img.icons8.com/color/512/sports.png',
-                description: 'Check Vercel logs for errors',
+                description: 'Catalog structure works - check scraper',
                 logo: 'https://img.icons8.com/color/512/sports.png'
             }]
         };
@@ -235,11 +232,9 @@ builder.defineStreamHandler(async ({ type, id }) => {
 // Get the addon interface
 const addonInterface = builder.getInterface();
 
-// Vercel serverless handler
+// Vercel serverless handler - Use Express-like routing with SDK
 module.exports = async (req, res) => {
     try {
-        console.log(`📥 Request: ${req.method} ${req.url || req.path || '/'}`);
-        
         // Set CORS headers FIRST
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -255,49 +250,26 @@ module.exports = async (req, res) => {
         const path = url.split('?')[0].split('#')[0];
         const query = new URLSearchParams((url.split('?')[1] || ''));
         
-        // Handle manifest FIRST (before configure)
+        // Handle manifest FIRST
         if (path === '/manifest.json') {
             try {
-                console.log('📄 Manifest request received');
-                
-                // Ensure manifest exists
-                if (!addonInterface || !addonInterface.manifest) {
-                    console.error('❌ addonInterface or manifest is missing');
-                    res.setHeader('Content-Type', 'application/json');
-                    res.setHeader('Access-Control-Allow-Origin', '*');
-                    res.status(500).json({ error: 'Manifest not available' });
-                    return;
-                }
-                
                 const manifestData = addonInterface.manifest;
-                console.log('📄 Manifest data:', JSON.stringify(manifestData, null, 2));
-                
                 res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                res.setHeader('Access-Control-Allow-Origin', '*');
-                res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-                res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
                 res.setHeader('Cache-Control', 'public, max-age=3600');
-                
                 res.status(200).json(manifestData);
-                console.log('✅ Manifest sent successfully');
+                return;
             } catch (err) {
-                console.error('❌ Manifest error:', err);
-                console.error('Error stack:', err.stack);
+                console.error('Manifest error:', err);
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Access-Control-Allow-Origin', '*');
-                res.status(500).json({ 
-                    error: 'Failed to generate manifest',
-                    message: err.message 
-                });
+                res.status(500).json({ error: 'Failed to generate manifest' });
+                return;
             }
-            return;
         }
         
         // Handle configure page
         if (path === '/' || path === '/configure') {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            
             try {
                 const configureHTML = require('./configure-html.js');
                 res.send(configureHTML);
@@ -305,7 +277,7 @@ module.exports = async (req, res) => {
                 const host = req.headers.host || 'localhost';
                 const protocol = req.headers['x-forwarded-proto'] || 'https';
                 const baseUrl = `${protocol}://${host}`;
-                res.send(`<!DOCTYPE html><html><head><title>NTVStream Sports</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e8;padding:4rem 2rem;text-align:center}h1{color:#00ff88}button{background:#00ff88;color:#000;border:none;padding:1rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin:1rem}</style></head><body><h1>🏟️ NTVStream Sports</h1><p>Live sports streaming for Stremio</p><button onclick="window.location.href='stremio://'+window.location.host+'/manifest.json'">⚡ Install in Stremio</button><p style='margin-top:2rem;color:#8b8b9e;font-size:0.9rem'>Manifest: <code>${baseUrl}/manifest.json</code></p></body></html>`);
+                res.send(`<!DOCTYPE html><html><head><title>NTVStream</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e8;padding:4rem 2rem;text-align:center}h1{color:#00ff88}button{background:#00ff88;color:#000;border:none;padding:1rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin:1rem}</style></head><body><h1>🏟️ NTVStream</h1><p>Live sports streaming for Stremio</p><button onclick="window.location.href='stremio://'+window.location.host+'/manifest.json'">⚡ Install in Stremio</button><p style='margin-top:2rem;color:#8b8b9e;font-size:0.9rem'>Manifest: <code>${baseUrl}/manifest.json</code></p></body></html>`);
             }
             return;
         }
@@ -367,6 +339,7 @@ module.exports = async (req, res) => {
         
     } catch (error) {
         console.error('Serverless error:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).json({ 
             error: 'Internal server error', 
             message: error.message

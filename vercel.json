@@ -4,20 +4,15 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node"
-    },
+    }
+  ],
+  "rewrites": [
     {
-      "src": "public/**",
-      "use": "@vercel/static"
+      "source": "/configure",
+      "destination": "/configure.html"
     }
   ],
   "routes": [
-    {
-      "src": "/configure",
-      "dest": "/public/configure.html",
-      "headers": {
-        "Content-Type": "text/html; charset=utf-8"
-      }
-    },
     {
       "src": "/(.*)",
       "dest": "/api/index.js",

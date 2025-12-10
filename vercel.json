@@ -2,57 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/server.js",
+      "src": "addon.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/configure",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/health",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/(.*)/manifest.json",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/manifest.json",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/catalog/(.*)",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/meta/(.*)",
-      "dest": "/dist/server.js"
-    },
-    {
-      "src": "/stream/(.*)",
-      "dest": "/dist/server.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/dist/server.js"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
-      ]
+      "dest": "/addon.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     }
   ]
 }
-

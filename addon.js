@@ -110,6 +110,25 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
             return { metas: [] };
         }
         
+        console.log(`📋 Fetched ${events.length} events from scraper`);
+        
+        // If no events found, add a test event so catalog shows up
+        if (events.length === 0) {
+            console.warn('⚠️ No events found - adding test event');
+            events = [{
+                id: 'ntv_test_event',
+                name: 'Test Event - NTVStream Scraper',
+                category: 'sports',
+                isLive: true,
+                timeStr: '🔴 LIVE',
+                link: 'https://ntvstream.cx',
+                server: 'kobra',
+                serverName: 'NTVStream KOBRA',
+                sources: 1,
+                matchedCategory: { id: 'sports', name: 'Sports', icon: '🏆' }
+            }];
+        }
+        
         const skip = parseInt(extra?.skip) || 0;
         const limit = 100;
         const paginatedEvents = events.slice(skip, skip + limit);
@@ -123,7 +142,20 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         
     } catch (error) {
         console.error('Catalog error:', error);
-        return { metas: [] };
+        console.error('Error stack:', error.stack);
+        // Return test event on error so catalog at least shows up
+        return { 
+            metas: [{
+                id: 'ntv_error',
+                type: 'tv',
+                name: 'Error Loading Events',
+                poster: 'https://img.icons8.com/color/512/sports.png',
+                posterShape: 'landscape',
+                background: 'https://img.icons8.com/color/512/sports.png',
+                description: 'Check Vercel logs for errors',
+                logo: 'https://img.icons8.com/color/512/sports.png'
+            }]
+        };
     }
 });
 

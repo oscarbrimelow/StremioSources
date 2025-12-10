@@ -350,6 +350,33 @@ export async function fetchStreamUrls(eventUrl: string, server: ServerConfig): P
                 'User-Agent': DEFAULT_HEADERS['User-Agent']
             }
         }));
+
+        // Follow embedded players to discover direct HLS/DASH links
+        const embedLinks = streams.filter(s => s.isEmbed).map(s => s.url);
+        const discovered: ScrapedStream[] = [];
+        for (const embed of embedLinks) {
+            try {
+                const embedHtml = await fetchWithRetry(embed, { headers: { Referer: eventUrl } });
+                const childStreams = extractStreamUrls(embedHtml, embed).map(cs => ({
+                    ...cs,
+                    headers: {
+                        Referer: server.baseUrl,
+                        'User-Agent': DEFAULT_HEADERS['User-Agent']
+                    }
+                }));
+                childStreams.forEach(cs => discovered.push(cs));
+            } catch {
+                // ignore
+            }
+        }
+        // Merge discovered direct streams
+        const seen = new Set(streams.map(s => s.url));
+        for (const s of discovered) {
+            if (s.url && !seen.has(s.url)) {
+                seen.add(s.url);
+                streams.push(s);
+            }
+        }
         
         // If no streams found, add the page as external URL
         if (streams.length === 0) {

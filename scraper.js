@@ -447,6 +447,39 @@ async function fetchStreamUrls(eventUrl, serverConfig) {
                 });
             }
         });
+
+        // Follow embedded players to discover direct HLS/DASH links
+        const embedLinks = streams.filter(s => s.isEmbed).map(s => s.url);
+        for (const embed of embedLinks) {
+            try {
+                const resp = await axios.get(embed, { headers });
+                const $e = cheerio.load(resp.data);
+                // find m3u8
+                const m3u8ChildMatches = resp.data.match(/(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/gi) || [];
+                m3u8ChildMatches.forEach((url, i) => {
+                    if (!streams.find(s => s.url === url)) {
+                        streams.push({
+                            url,
+                            title: `${serverConfig.name} - HLS ${i + 1}`,
+                            isEmbed: false
+                        });
+                    }
+                });
+                // direct video sources
+                $e('video source, video[src]').each((i, el) => {
+                    const src = $e(el).attr('src');
+                    if (src && src.startsWith('http') && !streams.find(s => s.url === src)) {
+                        streams.push({
+                            url: src,
+                            title: `${serverConfig.name} - Direct Video`,
+                            isEmbed: false
+                        });
+                    }
+                });
+            } catch (e) {
+                // ignore
+            }
+        }
         
     } catch (error) {
         console.error('Error fetching stream page:', error.message);

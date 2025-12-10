@@ -4,21 +4,9 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "api/configure/index.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    {
-      "src": "/configure",
-      "dest": "/api/configure"
-    },
-    {
-      "src": "/configure.html",
-      "dest": "/api/configure"
-    },
     {
       "src": "/(.*)",
       "dest": "/api/index.js",

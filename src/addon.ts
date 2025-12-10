@@ -4,8 +4,8 @@
  */
 
 import { addonBuilder } from 'stremio-addon-sdk';
-import { SERVERS, CATEGORIES, getCatalogDefinitions, ADDON_CONFIG } from './config';
-import { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls } from './scraper';
+import { SERVERS, CATEGORIES, ADDON_CONFIG } from './config';
+import { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls, fetchAllEvents } from './scraper';
 import { SportEvent, UserConfig, StremioMeta, StremioStream } from './types';
 
 // Build manifest
@@ -21,7 +21,13 @@ const manifest = {
     types: ['tv'],
     idPrefixes: ['ntv_'],
     
-    catalogs: getCatalogDefinitions(),
+    catalogs: [
+        {
+            id: 'streams',
+            type: 'tv',
+            name: 'NTVStream'
+        }
+    ],
     
     behaviorHints: {
         configurable: true,
@@ -113,7 +119,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         if (extra.search) {
             events = await searchEvents(extra.search, userConfig);
         } else {
-            events = await getEventsByCategory(id, userConfig);
+            events = await fetchAllEvents(userConfig);
         }
         
         const paginatedEvents = events.slice(skip, skip + limit);
@@ -182,9 +188,14 @@ builder.defineStreamHandler(async ({ type, id }) => {
                     url: stream.url,
                     title: `${event.serverName} - ${stream.title || `Stream ${index + 1}`}`,
                     name: stream.quality || 'HD',
-                    behaviorHints: stream.headers ? {
-                        proxyHeaders: { request: stream.headers }
-                    } : undefined
+                    behaviorHints: {
+                        proxyHeaders: {
+                            request: {
+                                Referer: server.baseUrl,
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                        }
+                    }
                 };
             } else {
                 return {

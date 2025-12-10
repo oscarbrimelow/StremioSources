@@ -343,6 +343,13 @@ export async function fetchStreamUrls(eventUrl: string, server: ServerConfig): P
         });
         
         streams = extractStreamUrls(html, eventUrl);
+        streams = streams.map(s => ({
+            ...s,
+            headers: {
+                Referer: server.baseUrl,
+                'User-Agent': DEFAULT_HEADERS['User-Agent']
+            }
+        }));
         
         // If no streams found, add the page as external URL
         if (streams.length === 0) {

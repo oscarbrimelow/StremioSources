@@ -138,30 +138,188 @@ module.exports = async (req, res) => {
         }
         
         // Parse URL - handle both query string and path
-        const url = req.url || '/';
-        const [path, queryString] = url.split('?');
-        const query = new URLSearchParams(queryString || '');
+        const url = req.url || req.path || '/';
+        const [path] = url.split('?');
         
-        // Handle configure page - serve HTML directly
-        if (path === '/configure' || path === '/configure.html') {
+        // CHECK CONFIGURE FIRST - before anything else!
+        if (path === '/configure' || path === '/configure.html' || url.includes('/configure')) {
+            // ALWAYS return HTML for configure - no exceptions!
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            
             try {
                 const configureHTML = require('./configure-html.js');
-                res.setHeader('Content-Type', 'text/html');
-                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-                res.setHeader('Pragma', 'no-cache');
-                res.setHeader('Expires', '0');
                 res.send(configureHTML);
-                return;
             } catch (e) {
-                // Fallback HTML if module fails
-                const host = req.headers.host || 'localhost';
-                const protocol = req.headers['x-forwarded-proto'] || 'https';
-                const fallbackUrl = `${protocol}://${host}`;
-                res.setHeader('Content-Type', 'text/html');
-                res.send(`<!DOCTYPE html><html><head><title>NTVStream Sports</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e8;padding:4rem 2rem;text-align:center}h1{color:#00ff88}button{background:#00ff88;color:#000;border:none;padding:1rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin:1rem}</style></head><body><h1>🏟️ NTVStream Sports</h1><p>Live sports streaming for Stremio</p><button onclick="window.location.href='stremio://'+window.location.host+'/manifest.json'">⚡ Install in Stremio</button><p style='margin-top:2rem;color:#8b8b9e;font-size:0.9rem'>Manifest: <code>${fallbackUrl}/manifest.json</code></p></body></html>`);
-                return;
-            }
+                // Inline fallback HTML - always works
+                const host = req.headers.host || req.get('host') || 'localhost';
+                const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http') || 'https';
+                const baseUrl = `${protocol}://${host}`;
+                
+                res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NTVStream Sports - Stremio Addon</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0a0a0f;
+            --surface: #151520;
+            --text: #e0e0e8;
+            --text-muted: #8b8b9e;
+            --accent: #00ff88;
+            --border: rgba(255, 255, 255, 0.08);
         }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+            padding: 4rem 2rem;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        .logo {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .tagline {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+        .main-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+        }
+        .install-btn {
+            width: 100%;
+            padding: 1.25rem 2rem;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .install-btn:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+        }
+        .url-display {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            word-break: break-all;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .copy-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background: #1a1a2e;
+            border-color: var(--accent);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">🏟️</div>
+            <h1>NTVStream Sports</h1>
+            <p class="tagline">Live sports streaming for Stremio</p>
+        </header>
+        <div class="main-card">
+            <button class="install-btn" onclick="installAddon()">
+                <span>⚡</span>
+                <span>Install in Stremio</span>
+            </button>
+            <div class="url-display" id="manifestUrl">${baseUrl}/manifest.json</div>
+            <button class="copy-btn" onclick="copyUrl()">Copy URL</button>
+        </div>
+        <footer class="footer">
+            <p>Built with <a href="https://github.com/Stremio/stremio-addon-sdk" target="_blank">Stremio Addon SDK</a></p>
+        </footer>
+    </div>
+    <script>
+        const baseUrl = window.location.origin;
+        document.getElementById('manifestUrl').textContent = baseUrl + '/manifest.json';
+        function installAddon() {
+            const manifestUrl = baseUrl + '/manifest.json';
+            const stremioUrl = 'stremio://' + manifestUrl.replace(/^https?:\\/\\//, '');
+            const link = document.createElement('a');
+            link.href = stremioUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => document.body.removeChild(link), 100);
+        }
+        function copyUrl() {
+            const url = baseUrl + '/manifest.json';
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>`);
+            }
+            return; // CRITICAL: Must return here!
+        }
+        
+        const query = new URLSearchParams((url.split('?')[1] || ''));
         
         // Handle manifest
         if (path === '/manifest.json' || path === '/') {

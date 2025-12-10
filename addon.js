@@ -56,23 +56,37 @@ function eventToMeta(event) {
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
     try {
+        console.log(`📋 Catalog request: type=${type}, id=${id}`);
+        
         let events = [];
         
+        // Add timeout for Vercel
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Catalog fetch timeout')), 8000)
+        );
+        
         if (extra?.search) {
-            events = await searchEvents(extra.search);
+            events = await Promise.race([
+                searchEvents(extra.search),
+                timeoutPromise
+            ]);
         } else {
-            events = await getEventsByCategory(id);
+            events = await Promise.race([
+                getEventsByCategory(id),
+                timeoutPromise
+            ]);
         }
         
         const skip = parseInt(extra?.skip) || 0;
-        const metas = events.slice(skip, skip + 100)
+        const meta = events.slice(skip, skip + 100)
             .map(eventToMeta)
             .filter(m => m !== null);
         
-        return { metas };
+        console.log(`📋 Returning ${meta.length} items for catalog: ${id}`);
+        return { meta };
     } catch (error) {
-        console.error('Catalog error:', error);
-        return { metas: [] };
+        console.error('Catalog error:', error.message || error);
+        return { meta: [] };
     }
 });
 

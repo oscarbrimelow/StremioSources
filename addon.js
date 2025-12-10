@@ -238,7 +238,9 @@ const addonInterface = builder.getInterface();
 // Vercel serverless handler
 module.exports = async (req, res) => {
     try {
-        // Set CORS headers
+        console.log(`📥 Request: ${req.method} ${req.url || req.path || '/'}`);
+        
+        // Set CORS headers FIRST
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -256,13 +258,37 @@ module.exports = async (req, res) => {
         // Handle manifest FIRST (before configure)
         if (path === '/manifest.json') {
             try {
+                console.log('📄 Manifest request received');
+                
+                // Ensure manifest exists
+                if (!addonInterface || !addonInterface.manifest) {
+                    console.error('❌ addonInterface or manifest is missing');
+                    res.setHeader('Content-Type', 'application/json');
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    res.status(500).json({ error: 'Manifest not available' });
+                    return;
+                }
+                
+                const manifestData = addonInterface.manifest;
+                console.log('📄 Manifest data:', JSON.stringify(manifestData, null, 2));
+                
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+                
+                res.status(200).json(manifestData);
+                console.log('✅ Manifest sent successfully');
+            } catch (err) {
+                console.error('❌ Manifest error:', err);
+                console.error('Error stack:', err.stack);
                 res.setHeader('Content-Type', 'application/json');
                 res.setHeader('Access-Control-Allow-Origin', '*');
-                res.setHeader('Cache-Control', 'public, max-age=3600');
-                res.status(200).json(addonInterface.manifest);
-            } catch (err) {
-                console.error('Manifest error:', err);
-                res.status(500).json({ error: 'Failed to generate manifest' });
+                res.status(500).json({ 
+                    error: 'Failed to generate manifest',
+                    message: err.message 
+                });
             }
             return;
         }

@@ -1,6 +1,6 @@
 /**
  * NTVStream Stremio Addon
- * Serverless-compatible for Vercel deployment
+ * Based on working PPVstreams structure, adapted for NTVStream
  */
 
 const { addonBuilder } = require('stremio-addon-sdk');
@@ -27,22 +27,39 @@ const manifest = {
 // Create builder
 const builder = new addonBuilder(manifest);
 
-// Store handlers
-let catalogHandler, metaHandler, streamHandler;
-
 /**
- * Convert event to Stremio meta format
+ * Convert event to Stremio meta preview format (for catalog)
  */
-function eventToMeta(event) {
+function eventToMetaPreview(event) {
     if (!event || !event.id || !event.name) {
-        console.warn('Invalid event:', event);
         return null;
     }
     
     const icon = event.matchedCategory?.icon || '🏆';
     const categoryName = event.matchedCategory?.name || 'Sports';
     
-    // Build description
+    return {
+        id: event.id,
+        type: 'tv',
+        name: event.isLive ? `🔴 ${event.name}` : event.name,
+        poster: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
+        posterShape: 'landscape',
+        background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
+        description: `${icon} ${categoryName} - ${event.serverName || 'NTVStream'}`,
+        logo: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
+    };
+}
+
+/**
+ * Convert event to Stremio meta detail format (for meta handler)
+ */
+function eventToMetaDetail(event) {
+    if (!event || !event.id || !event.name) {
+        return null;
+    }
+    
+    const icon = event.matchedCategory?.icon || '🏆';
+    const categoryName = event.matchedCategory?.name || 'Sports';
     const descParts = [
         `${icon} ${categoryName}`,
         `📺 ${event.serverName || 'NTVStream'}`,
@@ -50,67 +67,36 @@ function eventToMeta(event) {
         `📡 ${event.sources || 1} source(s)`
     ];
     
-    // Create meta object with all required fields
-    const meta = {
+    return {
         id: event.id,
         type: 'tv',
         name: event.isLive ? `🔴 ${event.name}` : event.name,
         poster: `https://img.icons8.com/color/512/${event.matchedCategory?.id || 'sports'}.png`,
-        posterShape: 'square',
+        posterShape: 'landscape',
         background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
         description: descParts.join('\n'),
-        genres: event.matchedCategory?.genres || ['Sports']
+        genres: event.matchedCategory?.genres || ['Sports'],
+        releaseInfo: new Date().getFullYear().toString(),
     };
-    
-    // Add releaseInfo if available (Stremio expects date string or year)
-    if (event.timeStr && event.timeStr !== 'Live' && event.timeStr !== '🔴 LIVE') {
-        meta.releaseInfo = event.timeStr;
-    } else {
-        // Use current year for live events
-        meta.releaseInfo = new Date().getFullYear().toString();
-    }
-    
-    return meta;
 }
 
 /**
- * Catalog Handler
+ * Catalog Handler - matches PPVstreams structure
  */
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
     try {
-        console.log(`📋 Catalog request: type=${type}, id=${id}, extra=`, extra);
+        console.log(`📋 Catalog: type=${type}, id=${id}`);
         
         let events = [];
         
-        // Increase timeout for Vercel (10s max for free tier)
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Catalog fetch timeout')), 9000)
-        );
-        
-        try {
-            if (extra?.search) {
-                console.log(`📋 Searching for: ${extra.search}`);
-                events = await Promise.race([
-                    searchEvents(extra.search),
-                    timeoutPromise
-                ]);
-            } else {
-                console.log(`📋 Getting events for category: ${id}`);
-                events = await Promise.race([
-                    getEventsByCategory(id),
-                    timeoutPromise
-                ]);
-            }
-            
-            console.log(`📋 Fetched ${events.length} events`);
-        } catch (fetchError) {
-            console.error('Error fetching events:', fetchError.message || fetchError);
-            // Return empty instead of crashing
-            return { metas: [] };
+        if (extra?.search) {
+            events = await searchEvents(extra.search);
+        } else {
+            events = await getEventsByCategory(id);
         }
         
         if (!Array.isArray(events)) {
-            console.error('Events is not an array:', typeof events);
+            console.error('Events is not an array');
             return { metas: [] };
         }
         
@@ -118,29 +104,15 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
         const limit = 100;
         const paginatedEvents = events.slice(skip, skip + limit);
         
-        console.log(`📋 Processing ${paginatedEvents.length} events (skip=${skip})`);
-        
-        const metas = paginatedEvents
-            .map(event => {
-                try {
-                    return eventToMeta(event);
-                } catch (err) {
-                    console.error('Error converting event to meta:', err, event);
-                    return null;
-                }
-            })
+        const results = paginatedEvents
+            .map(eventToMetaPreview)
             .filter(m => m !== null);
         
-        console.log(`📋 Returning ${metas.length} valid meta items for catalog: ${id}`);
+        console.log(`📋 Returning ${results.length} items for ${id}`);
+        return { metas: results };
         
-        if (metas.length === 0) {
-            console.warn(`⚠️ No metas returned for category ${id}. Events count: ${events.length}`);
-        }
-        
-        return { metas };
     } catch (error) {
-        console.error('Catalog handler error:', error.message || error);
-        console.error('Stack:', error.stack);
+        console.error('Catalog error:', error);
         return { metas: [] };
     }
 });
@@ -151,7 +123,13 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
 builder.defineMetaHandler(async ({ type, id }) => {
     try {
         const event = await getEventById(id);
-        return { meta: eventToMeta(event) };
+        if (!event) {
+            return { meta: null };
+        }
+        
+        const meta = eventToMetaDetail(event);
+        return { meta };
+        
     } catch (error) {
         console.error('Meta error:', error);
         return { meta: null };
@@ -163,31 +141,19 @@ builder.defineMetaHandler(async ({ type, id }) => {
  */
 builder.defineStreamHandler(async ({ type, id }) => {
     try {
-        console.log(`🎬 Stream request: type=${type}, id=${id}`);
+        console.log(`🎬 Stream: type=${type}, id=${id}`);
         
         const event = await getEventById(id);
         if (!event) {
-            console.log(`🎬 Event not found for id: ${id}`);
+            console.log(`🎬 Event not found: ${id}`);
             return { streams: [] };
         }
         
-        console.log(`🎬 Found event: ${event.name}, link: ${event.link}`);
-        
         const serverConfig = SERVERS[event.server] || { name: 'NTVStream', baseUrl: 'https://ntvstream.cx' };
-        
-        // Add timeout wrapper for Vercel (max 10s for free tier)
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Stream fetch timeout')), 8000)
-        );
-        
-        const scrapedStreams = await Promise.race([
-            fetchStreamUrls(event.link, serverConfig),
-            timeoutPromise
-        ]);
+        const scrapedStreams = await fetchStreamUrls(event.link, serverConfig);
         
         if (!scrapedStreams || scrapedStreams.length === 0) {
-            console.log(`🎬 No streams found, adding fallback`);
-            // Return the watch page as fallback
+            // Return watch page as fallback
             return {
                 streams: [{
                     externalUrl: event.link,
@@ -213,13 +179,14 @@ builder.defineStreamHandler(async ({ type, id }) => {
         
         console.log(`🎬 Returning ${streams.length} streams`);
         return { streams };
+        
     } catch (error) {
-        console.error('Stream error:', error.message || error);
-        // Return fallback stream instead of empty
+        console.error('Stream error:', error);
+        // Return fallback
         return {
             streams: [{
-                externalUrl: `https://ntvstream.cx`,
-                title: 'Error loading stream - Click to open NTVStream',
+                externalUrl: 'https://ntvstream.cx',
+                title: 'Error - Open NTVStream',
                 behaviorHints: { notWebReady: true }
             }]
         };
@@ -232,203 +199,7 @@ const addonInterface = builder.getInterface();
 // Vercel serverless handler
 module.exports = async (req, res) => {
     try {
-        // CHECK CONFIGURE FIRST - before ANYTHING else!
-        // Get path from every possible source
-        const rawUrl = req.url || req.path || req.originalUrl || '';
-        const rawPath = rawUrl.split('?')[0].split('#')[0];
-        
-        // Check if this is a configure request - be VERY aggressive
-        const isConfigure = rawPath === '/configure' || 
-                           rawPath === '/configure.html' || 
-                           rawPath.startsWith('/configure') ||
-                           rawUrl.includes('/configure') ||
-                           rawUrl.includes('configure') ||
-                           (req.url && String(req.url).includes('configure')) ||
-                           (req.path && String(req.path).includes('configure'));
-        
-        if (isConfigure) {
-            // Set headers
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            
-            // Get base URL
-            const host = req.headers.host || req.get?.('host') || 'localhost';
-            const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http') || 'https';
-            const baseUrl = `${protocol}://${host}`;
-            
-            // Try to load from module, fallback to inline
-            try {
-                const configureHTML = require('./configure-html.js');
-                res.send(configureHTML);
-            } catch (e) {
-                // Inline HTML - always works
-                res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NTVStream Sports - Stremio Addon</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0a0a0f;
-            --surface: #151520;
-            --text: #e0e0e8;
-            --text-muted: #8b8b9e;
-            --accent: #00ff88;
-            --border: rgba(255, 255, 255, 0.08);
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            line-height: 1.6;
-            padding: 4rem 2rem;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 4rem;
-        }
-        .logo {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-        }
-        h1 {
-            font-size: 2rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        .tagline {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
-        .main-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 3rem;
-            margin-bottom: 2rem;
-        }
-        .install-btn {
-            width: 100%;
-            padding: 1.25rem 2rem;
-            background: var(--accent);
-            color: #000;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            transition: all 0.2s;
-        }
-        .install-btn:hover {
-            background: #00cc6a;
-            transform: translateY(-2px);
-        }
-        .url-display {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            word-break: break-all;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-        .copy-btn {
-            width: 100%;
-            padding: 0.875rem;
-            background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .copy-btn:hover {
-            background: #1a1a2e;
-            border-color: var(--accent);
-        }
-        .footer {
-            text-align: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border);
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-        .footer a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <div class="logo">🏟️</div>
-            <h1>NTVStream Sports</h1>
-            <p class="tagline">Live sports streaming for Stremio</p>
-        </header>
-        <div class="main-card">
-            <button class="install-btn" onclick="installAddon()">
-                <span>⚡</span>
-                <span>Install in Stremio</span>
-            </button>
-            <div class="url-display" id="manifestUrl">${baseUrl}/manifest.json</div>
-            <button class="copy-btn" onclick="copyUrl()">Copy URL</button>
-        </div>
-        <footer class="footer">
-            <p>Built with <a href="https://github.com/Stremio/stremio-addon-sdk" target="_blank">Stremio Addon SDK</a></p>
-        </footer>
-    </div>
-    <script>
-        const baseUrl = window.location.origin;
-        document.getElementById('manifestUrl').textContent = baseUrl + '/manifest.json';
-        function installAddon() {
-            const manifestUrl = baseUrl + '/manifest.json';
-            const stremioUrl = 'stremio://' + manifestUrl.replace(/^https?:\\/\\//, '');
-            const link = document.createElement('a');
-            link.href = stremioUrl;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            setTimeout(() => document.body.removeChild(link), 100);
-        }
-        function copyUrl() {
-            const url = baseUrl + '/manifest.json';
-            navigator.clipboard.writeText(url).then(() => {
-                alert('URL copied to clipboard!');
-            });
-        }
-    </script>
-</body>
-</html>`);
-            }
-            return; // MUST return - don't continue!
-        }
-        
-        // Set CORS headers for other requests
+        // Set CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -438,13 +209,30 @@ module.exports = async (req, res) => {
             return;
         }
         
-        // Parse URL - handle both query string and path
+        // Parse URL
         const url = req.url || req.path || req.originalUrl || '/';
         const path = url.split('?')[0].split('#')[0];
         const query = new URLSearchParams((url.split('?')[1] || ''));
         
+        // Handle configure page FIRST
+        if (path === '/' || path === '/configure') {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            
+            try {
+                const configureHTML = require('./configure-html.js');
+                res.send(configureHTML);
+            } catch (e) {
+                const host = req.headers.host || 'localhost';
+                const protocol = req.headers['x-forwarded-proto'] || 'https';
+                const baseUrl = `${protocol}://${host}`;
+                res.send(`<!DOCTYPE html><html><head><title>NTVStream Sports</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e8;padding:4rem 2rem;text-align:center}h1{color:#00ff88}button{background:#00ff88;color:#000;border:none;padding:1rem 2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin:1rem}</style></head><body><h1>🏟️ NTVStream Sports</h1><p>Live sports streaming for Stremio</p><button onclick="window.location.href='stremio://'+window.location.host+'/manifest.json'">⚡ Install in Stremio</button><p style='margin-top:2rem;color:#8b8b9e;font-size:0.9rem'>Manifest: <code>${baseUrl}/manifest.json</code></p></body></html>`);
+            }
+            return;
+        }
+        
         // Handle manifest
-        if (path === '/manifest.json' || path === '/') {
+        if (path === '/manifest.json') {
             res.setHeader('Content-Type', 'application/json');
             res.json(addonInterface.manifest);
             return;
@@ -459,24 +247,12 @@ module.exports = async (req, res) => {
                 extra[key] = value;
             });
             try {
-                // Add timeout wrapper
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Request timeout')), 9000)
-                );
-                
-                const result = await Promise.race([
-                    addonInterface.catalog.get({ type, id, extra }),
-                    timeoutPromise
-                ]);
-                
+                const result = await addonInterface.catalog.get({ type, id, extra });
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json(result);
             } catch (err) {
-                console.error('Catalog handler error:', err.message || err);
-                // Return empty catalog instead of error
+                console.error('Catalog handler error:', err);
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json({ metas: [] });
             }
             return;
@@ -492,7 +268,8 @@ module.exports = async (req, res) => {
                 res.json(result);
             } catch (err) {
                 console.error('Meta handler error:', err);
-                res.status(500).json({ error: err.message });
+                res.setHeader('Content-Type', 'application/json');
+                res.json({ meta: null });
             }
             return;
         }
@@ -502,24 +279,12 @@ module.exports = async (req, res) => {
         if (streamMatch) {
             const [, type, id] = streamMatch;
             try {
-                // Add timeout wrapper
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Request timeout')), 9000)
-                );
-                
-                const result = await Promise.race([
-                    addonInterface.stream.get({ type, id }),
-                    timeoutPromise
-                ]);
-                
+                const result = await addonInterface.stream.get({ type, id });
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json(result);
             } catch (err) {
-                console.error('Stream handler error:', err.message || err);
-                // Return empty streams instead of error to prevent Stremio errors
+                console.error('Stream handler error:', err);
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('Access-Control-Allow-Origin', '*');
                 res.json({ streams: [] });
             }
             return;

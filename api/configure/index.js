@@ -235,10 +235,10 @@ const configureHTML = `<!DOCTYPE html>
 </html>`;
 
 module.exports = (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.send(configureHTML);
+    res.status(200).send(configureHTML);
 };
 

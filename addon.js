@@ -252,6 +252,18 @@ module.exports = async (req, res) => {
         
         // Handle manifest FIRST
         if (path === '/manifest.json') {
+            if (req.method === 'HEAD') {
+                try {
+                    const manifestData = addonInterface.manifest;
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.setHeader('Cache-Control', 'public, max-age=3600');
+                    res.status(200).end();
+                    return;
+                } catch (err) {
+                    res.status(500).end();
+                    return;
+                }
+            }
             try {
                 const manifestData = addonInterface.manifest;
                 res.setHeader('Content-Type', 'application/json; charset=utf-8');

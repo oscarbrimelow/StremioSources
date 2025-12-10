@@ -4,15 +4,20 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node"
-    }
-  ],
-  "rewrites": [
+    },
     {
-      "source": "/configure",
-      "destination": "/configure.html"
+      "src": "api/configure/index.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/configure",
+      "dest": "/api/configure/index.js",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8"
+      }
+    },
     {
       "src": "/manifest.json",
       "dest": "/api/index.js"

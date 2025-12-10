@@ -10,28 +10,25 @@ const { getEventsByCategory, searchEvents, getEventById, fetchStreamUrls } = req
 // Addon manifest - Single catalog like StreamsPPV
 const manifest = {
     id: 'community.ntvstream.sports',
-    version: '1.0.0',
-    name: 'NTVStream Sports',
+    version: '1.0.1',
+    name: 'NTVStream',
     description: 'Live sports streaming from NTVStream. Watch Football, Basketball, Hockey, Cricket, UFC, Boxing and more!',
     logo: 'https://img.icons8.com/color/512/stadium.png',
     background: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920',
-    resources: ['catalog', 'meta', 'stream'],
+    resources: [
+        { name: 'stream', types: ['tv'] },
+        { name: 'meta', types: ['tv'] },
+        { name: 'catalog', types: ['tv'] }
+    ],
     types: ['tv'],
     idPrefixes: ['ntv_'],
     catalogs: [
         { 
             id: 'streams', 
             type: 'tv', 
-            name: 'Live Sports Streams',
-            extra: [
-                { name: 'skip', isRequired: false },
-                { name: 'search', isRequired: false }
-            ]
+            name: 'NTVStream'
         }
-    ],
-    behaviorHints: {
-        configurable: false
-    }
+    ]
 };
 
 // Create builder

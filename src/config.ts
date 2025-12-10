@@ -5,12 +5,60 @@
 import { ServerConfig, CategoryConfig } from './types';
 
 export const SERVERS: Record<string, ServerConfig> = {
+    kobra: {
+        id: 'kobra',
+        name: 'NTVStream KOBRA',
+        baseUrl: 'https://ntvstream.cx/matches/kobra',
+        enabled: true,
+        priority: 1,
+        description: 'KOBRA server match list'
+    },
+    titan: {
+        id: 'titan',
+        name: 'NTVStream TITAN',
+        baseUrl: 'https://ntvstream.cx/matches/titan',
+        enabled: true,
+        priority: 2,
+        description: 'TITAN server match list'
+    },
+    raptor: {
+        id: 'raptor',
+        name: 'NTVStream RAPTOR',
+        baseUrl: 'https://ntvstream.cx/matches/raptor',
+        enabled: true,
+        priority: 3,
+        description: 'RAPTOR server match list'
+    },
+    phoenix: {
+        id: 'phoenix',
+        name: 'NTVStream PHOENIX',
+        baseUrl: 'https://ntvstream.cx/matches/phoenix',
+        enabled: true,
+        priority: 4,
+        description: 'PHOENIX server match list'
+    },
+    scorpion: {
+        id: 'scorpion',
+        name: 'NTVStream SCORPION',
+        baseUrl: 'https://ntvstream.cx/matches/scorpion',
+        enabled: true,
+        priority: 5,
+        description: 'SCORPION server match list'
+    },
+    viper: {
+        id: 'viper',
+        name: 'NTVStream VIPER',
+        baseUrl: 'https://ntvstream.cx/matches/viper',
+        enabled: true,
+        priority: 6,
+        description: 'VIPER server match list'
+    },
     ntvstream: {
         id: 'ntvstream',
         name: 'NTVStream',
         baseUrl: 'https://ntvstream.cx',
         enabled: true,
-        priority: 1,
+        priority: 10,
         description: 'Primary live sports streaming source',
         logo: 'https://ntvstream.cx/favicon.ico'
     },
@@ -19,7 +67,7 @@ export const SERVERS: Record<string, ServerConfig> = {
         name: 'NTVStream Backup',
         baseUrl: 'https://ntvstream.live',
         enabled: true,
-        priority: 2,
+        priority: 11,
         description: 'Backup NTVStream server'
     },
     ppvland: {

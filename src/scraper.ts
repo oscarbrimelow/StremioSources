@@ -390,11 +390,7 @@ export async function fetchAllEvents(userConfig: UserConfig = {}): Promise<Sport
     // Fetch from all servers in parallel
     const results = await Promise.allSettled(
         servers.map(async server => {
-            if (server.id.startsWith('ntvstream')) {
-                return await fetchNTVStreamEvents(server);
-            }
-            // Add more server-specific fetchers here
-            return [];
+            return await fetchNTVStreamEvents(server);
         })
     );
     

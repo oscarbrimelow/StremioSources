@@ -18,7 +18,7 @@ const manifest = {
     background: ADDON_CONFIG.background,
     
     resources: ['catalog', 'meta', 'stream'],
-    types: ['tv', 'channel'],
+    types: ['tv'],
     idPrefixes: ['ntv_'],
     
     catalogs: getCatalogDefinitions(),

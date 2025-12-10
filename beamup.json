@@ -1,0 +1,11 @@
+{
+  "name": "ntvstream-sports",
+  "type": "node",
+  "node": {
+    "main": "dist/server.js"
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+
